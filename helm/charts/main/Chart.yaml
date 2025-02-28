@@ -1,0 +1,6 @@
+apiVersion: v2
+name: splate-event-collector-ms-main
+description: Silver Plate Event Collector
+type: application
+version: 0.1.0
+appVersion: dev

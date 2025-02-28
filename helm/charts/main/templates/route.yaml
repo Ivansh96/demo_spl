@@ -1,0 +1,21 @@
+{{- if .Values.main.route.fqdn -}}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "generic.fullname" . }}
+  {{- with .Values.main.route.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  host: "{{ .Values.main.route.fqdn }}"
+  port:
+    targetPort: http
+  to:
+    kind: Service
+    name: {{ include "generic.fullname" . }}
+    weight: 100
+  tls:
+    termination: edge
+{{ include "generic.helmRouteFix" $ }}
+{{- end -}}

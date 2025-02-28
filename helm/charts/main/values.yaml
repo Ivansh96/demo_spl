@@ -1,0 +1,138 @@
+global:
+  serviceAccount:
+    # -- Аннотации сервисного аккаунта K8s
+    annotations: { }
+    # -- Имя сервисного аккаунта K8s
+    name: ""
+
+initContainer:
+  resources:
+    requests:
+      memory: "10Mi"
+      cpu: "10m"
+    limits:
+      memory: "50Mi"
+      cpu: "50m"
+
+main:
+  replicas: 1
+
+  image:
+    # -- Адрес Docker Registry, например registry.domain.tld
+    registry: ''
+    # -- Путь к образу, например cradle/some-component, задается при сборке
+    path: ''
+    # -- Тег образа, задается при сборке
+    tag: ''
+    pullPolicy: IfNotPresent
+
+  # -- Дополнительные секреты для получения Docker-образов
+  imagePullSecrets: [ ]
+  # -- Параметр для переопределения имени объектов, создаваемых при разворачивании
+  nameOverride: ""
+  # -- Параметр для переопределения имени объектов, создаваемых при разворачивании
+  fullnameOverride: ""
+
+  serviceAccount:
+    # -- Аннотации сервисного аккаунта K8s
+    annotations: { }
+    # -- Имя сервисного аккаунта K8s
+    name: ""
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+  buildNumber: ''
+
+  dnsPolicy: ClusterFirst
+  hostAliases: [ ]
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    privileged: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+
+  nodeSelector: { }
+  tolerations: [ ]
+  affinity: { }
+
+  route:
+    # -- FQDN для публикации Route, для режима отладки
+    fqdn: ''
+    annotations:
+      "haproxy.router.openshift.io/timeout": "5m"
+
+  params:
+    # -- JAVA_OPTIONS
+    javaOptions: ''
+    # -- JAVA_OPTIONS, передаваемые через секреты
+    secretJavaOptions: ''
+    # -- Дополнительные переменные окружения
+    extraEnv: { }
+    # -- Дополнительные переменные окружения, передаваемые через секреты
+    extraSecretEnv: { }
+    # -- Параметры логгирования
+    logging:
+      level:
+        # -- Уровень логирования (общий)
+        root: INFO
+        # -- Уровень логирования (платформа)
+        platform: INFO
+        # -- Уровень логирования (приложение)
+        project: INFO
+        # -- Уровень логирования (Spring Cloud Gateway)
+        springCloudGateway: INFO
+        # -- Уровень логирования (Spring Security)
+        springSecurity: INFO
+    database:
+      # -- Адрес сервера СУБД, например postgres:5432
+      address: null
+      # -- Имя БД, в этой секции можно указать дополнительные параметры соединения с БД, например настройки SSL.
+      name: splate_event_collector_ms_main
+      # -- Имя пользователя с полномочиями на чтение и запись
+      username: splate_event_collector_ms_main_default
+      # -- Пароль пользователя с полномочиями на чтение и запись
+      password: null
+
+    # -- Параметры маршрутизации логов SIEM
+    syslog:
+      # -- Флаг включения маршрутизации логов по протоколу syslog
+      enabled: false
+      # -- Тип сети tcp|udp
+      network: udp
+      # -- Адрес syslog-сервера
+      address: localhost:514
+    application:
+      syslog:
+        externalPort: null
+      rabbitmq:
+        enabled: true
+        host: cradle-blueprints-rabbitmq-app-rabbitmq
+        port: 5672
+        username: todo
+        password: null
+
+migrations:
+  params:
+    database:
+      # -- Имя владельца (owner)
+      username: splate_event_collector_ms_main
+      # -- Пароль владельца (owner)
+      password: null
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"

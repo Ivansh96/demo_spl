@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "generic.fullname" . }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "0"
+data:
+  # Общие опции
+  JAVA_OPTIONS: '{{ .Values.main.params.javaOptions }}'
+  LOGGING_LEVEL_ROOT: '{{ .Values.main.params.logging.level.root }}'
+  LOGGING_LEVEL_PLATFORM: '{{ .Values.main.params.logging.level.platform }}'
+  LOGGING_LEVEL_PRJ: '{{ .Values.main.params.logging.level.project }}'
+  LOGGING_LEVEL_SPRING_CLOUD_GATEWAY: '{{ .Values.main.params.logging.level.springCloudGateway }}'
+  LOGGING_LEVEL_SPRING_SECURITY: '{{ .Values.main.params.logging.level.springSecurity }}'
+  SYSLOG_ENABLED: '{{ .Values.main.params.syslog.enabled }}'
+  SYSLOG_ADDR: '{{ .Values.main.params.syslog.address }}'
+  SYSLOG_NETWORK: '{{ .Values.main.params.syslog.network }}'
+
+  # Application properties
+  {{ if .Values.main.params.application.rabbitmq.enabled -}}
+  APPLICATION_RABBITMQ_HOST: '{{ .Values.main.params.application.rabbitmq.host }}'
+  APPLICATION_RABBITMQ_PORT: '{{ .Values.main.params.application.rabbitmq.port }}'
+  {{- end }}
+  DB_URL: 'jdbc:postgresql://{{ .Values.main.params.database.address }}/{{ .Values.main.params.database.name }}'
+
+  # Generic properties
+  {{ range $index, $element := .Values.main.params.extraEnv }}
+  {{- $index }}: '{{ $element -}}'
+  {{ end -}}

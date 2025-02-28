@@ -1,0 +1,293 @@
+withFolderProperties{
+    AGENT_NODE_LABEL = "${env.AGENT_NODE_LABEL}"
+    OPENJDK_17_AGENT_IMAGE = "${env.OPENJDK_17_AGENT_IMAGE}"
+    COMMON_AGENT_IMAGE = "${env.COMMON_AGENT_IMAGE}"
+    K8S_AGENT_IMAGE  = "${env.K8S_AGENT_IMAGE}"
+    DOCS_AGENT_IMAGE  = "${env.DOCS_AGENT_IMAGE}"
+    MAVEN_REPOSITORY = "${env.MAVEN_REPOSITORY}"
+    MAVEN_SNAPSHOT_REPOSITORY = "${env.MAVEN_SNAPSHOT_REPOSITORY}"
+    MAVEN_RELEASE_REPOSITORY = "${env.MAVEN_RELEASE_REPOSITORY}"
+    REGISTRY = "${env.REGISTRY}"
+    OPENJDK_17_RUNTIME_IMAGE = "${env.OPENJDK_17_RUNTIME_IMAGE}"
+    HELM_REGISTRY = "${env.HELM_REGISTRY}"
+    REGISTRY_CRED_ID = "${env.REGISTRY_CRED_ID}"
+
+    ARTIFACT_NAMESPACE = "${env.ARTIFACT_NAMESPACE}"
+
+    LUNTRY_JOB = "${env.LUNTRY_JOB}"
+    SAST_JOB = "${env.SAST_JOB}"
+    SCA_JOB = "${env.SCA_JOB}"
+    CP_IMAGE_TO_PROD_JOB = "${env.CP_IMAGE_TO_PROD_JOB}"
+}
+
+def isSemver(value) {
+    def m = (value =~ /^([0-9]|[1-9][0-9]*)\.([0-9]|[1-9][0-9]*)\.([0-9]|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+)?\u0024/)
+    return m.matches()
+}
+
+def getChartName() {
+    return sh(script: 'ci/cmd.sh get-helm-chart-name', returnStdout: true)
+}
+
+def getChartVersion() {
+    return  sh(script: 'ci/cmd.sh get-helm-chart-version', returnStdout: true)
+}
+
+def buildChartVersion(suffix) {
+    def chartVersion = getChartVersion()
+    return suffix ? chartVersion + suffix : chartVersion
+}
+
+def getDockerImagePath() {
+    return  sh(script: 'ci/cmd.sh build-docker-image-path', returnStdout: true)
+}
+
+def getDockerImageFullPath() {
+    return  sh(script: 'ci/cmd.sh build-docker-image-full-path', returnStdout: true)
+}
+
+def run(cmd) {
+    return sh(returnStdout: true, script: cmd).trim()
+}
+
+def getDockerAgentArgs() {
+    if (!params.tests) {
+        return ""
+    }
+    run("mkdir -p ${HOME}/.m2")
+    return "-v /var/run/docker.sock:/var/run/docker.sock:ro " +             // pass docker socket
+        "-v /etc/passwd:/etc/passwd:ro " +                                  // pass user info
+        "-v ${HOME}/.m2:${HOME}/.m2 " +                                     // pass agent's .m2 dir
+        "-u ${run("id -u")}:${run("getent group docker | cut -d: -f3")}"    // set uid and docker gid
+}
+
+def getMavenSkipTests() {
+    return !params.tests
+}
+
+pipeline {
+    agent {
+        label "${AGENT_NODE_LABEL}"
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10', artifactNumToKeepStr: '10'))
+    }
+
+    parameters {
+        booleanParam(
+            name: 'clean_workspace',
+            defaultValue: false,
+            description: 'Флаг включения очистки рабочей области Jenkins'
+        )
+
+        booleanParam(
+            name: 'sca',
+            defaultValue: false,
+            description: 'Флаг запуска SCA'
+        )
+
+        booleanParam(
+            name: 'luntry',
+            defaultValue: false,
+            description: 'Флаг запуска Luntry'
+        )
+
+        booleanParam(
+            name: 'sast',
+            defaultValue: false,
+            description: 'Флаг запуска SAST'
+        )
+
+        booleanParam(
+            name: 'tests',
+            defaultValue: params['tests'] ?: false,
+            description: 'Флаг запуска тестов при сборке'
+        )
+
+        booleanParam(
+            name: 'cp_image_to_prod',
+            defaultValue: false,
+            description: 'Флаг запуска переноса образа'
+        )
+    }
+
+    environment {
+        GIT_COMMIT_SHORT = "${GIT_COMMIT.take(7)}"
+
+        CHART_NAME = "${getChartName()}"
+        CHART_VERSION = "${buildChartVersion(isSemver(GIT_BRANCH) ? '' : '-dev')}" 
+
+        DEFAULT_APP_NAME = "${JOB_BASE_NAME.minus('build-')}"
+        APP_NAME = "${APP_NAME ?: DEFAULT_APP_NAME}"
+        APP_VERSION = "${CHART_VERSION}-${GIT_COMMIT_SHORT}"
+
+        MAVEN_REPOSITORY = "${MAVEN_REPOSITORY}"
+        MAVEN_SNAPSHOT_REPOSITORY = "${MAVEN_SNAPSHOT_REPOSITORY}"
+        MAVEN_RELEASE_REPOSITORY = "${MAVEN_RELEASE_REPOSITORY}"
+
+        DEFAULT_SETTINGS_XML_PATH = "${WORKSPACE}/ci/settings.xml"
+        BUILD_SETTINGS_XML_PATH = "${WORKSPACE}/ci/settings_${BUILD_ENVIRONMENT}.xml"
+        SETTINGS_XML_PATH = "${fileExists(BUILD_SETTINGS_XML_PATH) ? BUILD_SETTINGS_XML_PATH : DEFAULT_SETTINGS_XML_PATH}"
+
+        SOURCES_DIR = "${WORKSPACE}/src"
+
+        REGISTRY = "${REGISTRY}"
+        OPENJDK_17_RUNTIME_IMAGE = "${OPENJDK_17_RUNTIME_IMAGE}"
+        ARTIFACT_NAMESPACE="${ARTIFACT_NAMESPACE}"
+
+        HELM_REGISTRY = "${HELM_REGISTRY}"
+    }
+
+    stages {
+        stage("Set build name") {
+            steps {
+                wrap([$class: 'BuildUser']) {
+                    buildName "$BUILD_NUMBER-$GIT_BRANCH-$APP_VERSION"
+                    buildDescription """
+                    Executed @ ${NODE_NAME}. Build started by ${BUILD_USER}.
+                    Branch: ${GIT_BRANCH}
+                    Commit: ${GIT_COMMIT_SHORT}
+                    ChartName: ${CHART_NAME}
+                    ChartVersion: ${CHART_VERSION}
+                    AppVersion: ${APP_VERSION}
+                    Image: ${getDockerImageFullPath()}
+                    """.stripIndent()
+                }
+            }
+        }
+
+        stage("Clean workspace") {
+            steps {
+                cleanWs()
+                checkout scm
+            }
+
+            when {
+                expression {
+                    return params.clean_workspace
+                }
+            }
+        }
+
+        stage("Run SCA") {
+            steps {
+                build job: "${SCA_JOB}", parameters: [
+                    [$class: 'StringParameterValue', name: 'APPLICATION_REPOSITORY_URL', value: "${scm.userRemoteConfigs[0].url}"],
+                    [$class: 'StringParameterValue', name: 'APPLICATION_REPOSITORY_BRANCH', value: "${BRANCH}"], 
+                ]
+            }
+
+            when {
+                expression {
+                    return params.sca
+                }
+            }
+        }
+
+        stage("Run PT AI SAST") {
+            steps {
+                build job: "${SAST_JOB}", parameters: [
+                    [$class: 'StringParameterValue', name: 'APPLICATION_REPOSITORY_URL', value: "${scm.userRemoteConfigs[0].url}"],
+                    [$class: 'StringParameterValue', name: 'APPLICATION_REPOSITORY_BRANCH', value: "${BRANCH}"],
+                    [$class: 'StringParameterValue', name: 'SAST_LANG', value: "Java"],
+                ]
+            }
+
+            when {
+                expression {
+                    return params.sast
+                }
+            }
+        }
+
+        stage("Build project") {
+            agent {
+                docker {
+                    image "${OPENJDK_17_AGENT_IMAGE}"
+                    label "${AGENT_NODE_LABEL}"
+                    args getDockerAgentArgs()
+                    reuseNode true
+                }
+            }
+
+            steps {
+                withCredentials([usernamePassword(credentialsId: "$REGISTRY_CRED_ID", usernameVariable: 'MAVEN_USERNAME', passwordVariable: 'MAVEN_PASSWORD')]) {
+                    sh "ci/cmd.sh build-maven-project ${getMavenSkipTests()}"
+                }
+            }
+        }
+
+        stage("Build docker image") {
+            steps {
+                withCredentials([usernamePassword(credentialsId: "$REGISTRY_CRED_ID", usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+                    sh "ci/cmd.sh build-docker-image"
+                }
+            }
+        }
+
+        stage("Run Luntry") {
+            steps {
+                build job: "${LUNTRY_JOB}", parameters: [
+                    [$class: 'StringParameterValue', name: 'IMAGE', value: "${getDockerImageFullPath()}"],
+                ]
+            }
+
+            when {
+                expression {
+                    return params.luntry
+                }
+            }
+        }
+
+        stage("Build docs") {
+            agent {
+                docker {
+                    image "${DOCS_AGENT_IMAGE}"
+                    label "${AGENT_NODE_LABEL}"
+                    reuseNode true
+                }
+            }
+
+            steps {
+                withCredentials([usernamePassword(credentialsId: "$REGISTRY_CRED_ID", usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+                    sh "/var/lib/app/cmd.sh build-docs"
+                }
+            }
+        }
+        
+        stage("Publish helm chart") {
+            agent {
+                docker {
+                    image "${K8S_AGENT_IMAGE}"
+                    label "${AGENT_NODE_LABEL}"
+                    reuseNode true
+                }
+            }
+
+            steps {
+                withCredentials([usernamePassword(credentialsId: "$REGISTRY_CRED_ID", usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+                    sh "ci/cmd.sh publish-helm-chart"
+                }
+            }
+        }
+
+        stage("Copy image to production registry") {
+            steps {
+                build job: "${CP_IMAGE_TO_PROD_JOB}", parameters: [
+                    [$class: 'StringParameterValue', name: 'IMAGE', value: "${getDockerImageFullPath()}"],
+                    [$class: 'StringParameterValue', name: 'APPLICATION_NAME', value: "${scm.userRemoteConfigs[0].url.split("/")[-1]}"],
+                    [$class: 'StringParameterValue', name: 'LANGUAGE', value: "Java"],
+                    [$class: 'StringParameterValue', name: 'REPOSITORY_BRANCH', value: "${BRANCH}"],
+                    [$class: 'StringParameterValue', name: 'REPOSITORY_NAME', value: "${scm.userRemoteConfigs[0].url.split("/")[-1]}"],
+                ]
+            }
+
+            when {
+                expression {
+                    return params.cp_image_to_prod
+                }
+            }
+        }
+    }
+}

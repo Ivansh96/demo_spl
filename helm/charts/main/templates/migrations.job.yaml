@@ -1,0 +1,71 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "generic.fullname" (. | merge (dict "ResourceName" "migrations")) }}
+  labels:
+    {{- include "generic.labels" (. | merge (dict "ResourceName" "migrations")) | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation
+    "helm.sh/hook-weight": "1"
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "generic.selectorLabels" (. | merge (dict "ResourceName" "migrations")) | nindent 8 }}
+      annotations:
+        version: {{ include "generic.fullversion" (. | merge (dict "ResourceName" "migrations")) }}
+      {{- with .Values.main.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.main.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "generic.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.main.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ include "generic.name" (. | merge (dict "ResourceName" "migrations")) }}
+          image: "{{ .Values.main.image.registry }}/{{ .Values.main.image.path }}:{{ .Values.main.image.tag }}"
+          imagePullPolicy: "{{ .Values.main.image.pullPolicy }}"
+          command: ['/home/default/docker-entrypoint.sh']
+          args: ['migrations']
+          envFrom:
+            - configMapRef:
+                name: {{ include "generic.fullname" . }}
+            - secretRef:
+                name: {{ include "generic.fullname" . }}
+            - configMapRef:
+                name: {{ include "generic.fullname" (. | merge (dict "ResourceName" "migrations")) }}
+            - secretRef:
+                name: {{ include "generic.fullname" (. | merge (dict "ResourceName" "migrations")) }}
+          resources:
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.main.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      restartPolicy: Never
+      dnsPolicy: {{ .Values.main.dnsPolicy }}
+      {{- with .Values.main.hostAliases }}
+      hostAliases:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.main.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.main.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.main.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

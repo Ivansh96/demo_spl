@@ -1,0 +1,16 @@
+output:
+  - type: syslog
+    enabled_expression: 'env("SYSLOG_ENABLED") == "true"'
+    filters:
+      - ^CEF
+    config:
+      address: '{{ env "SYSLOG_ADDR" }}'
+      network: '{{ env "SYSLOG_NETWORK" }}'
+
+tasks:
+- name: start
+  action: exec
+  config:
+    cmd: bash
+    args: ["-c", "java $JAVA_OPTIONS $SECRET_JAVA_OPTIONS -jar /home/default/app.jar"]
+    print_output: true

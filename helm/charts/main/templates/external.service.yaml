@@ -1,0 +1,18 @@
+{{ if .Values.main.params.application.syslog.externalPort }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "generic.fullname" (. | merge (dict "ResourceName" "external")) }}
+  labels:
+    {{- include "generic.labels" . | nindent 4 }}
+spec:
+  type: NodePort
+  selector:
+    {{- include "generic.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: syslog
+      targetPort: syslog
+      protocol: UDP
+      port: 514
+      nodePort: {{ .Values.main.params.application.syslog.externalPort }}
+{{ end }}

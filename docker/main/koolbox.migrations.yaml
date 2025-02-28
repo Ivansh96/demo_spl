@@ -1,0 +1,8 @@
+tasks:
+- name: start
+  action: exec
+  config:
+    cmd: bash
+    args: ["-c", "/opt/liquibase/liquibase --log-level=DEBUG --driver=org.postgresql.Driver --changeLogFile=migrations/db.changelog-master.yaml --url=${DB_URL} --username=${DB_USERNAME} --password=${DB_PASSWORD} --liquibaseSchemaName=migration --headless=true update"]
+    print_output: true
+

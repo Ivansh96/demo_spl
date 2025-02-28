@@ -1,0 +1,72 @@
+management:
+  server:
+    port: ${SERVICE_MANAGEMENT_PORT:8090}
+  endpoints:
+    web:
+      exposure:
+        include: prometheus, health, info
+    health:
+      probes:
+        enabled: true
+spring:
+  main:
+    banner-mode: off
+    cloud-platform: kubernetes
+    web-application-type: REACTIVE
+  application:
+    name: splate-event-collector-ms-main
+  jackson:
+    default-property-inclusion: non_null
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+  datasource:
+    url: ${application.database.url}
+    username: ${application.database.username}
+    password: ${application.database.password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${MAXIMUM_POOL_SIZE:10}
+      connection-timeout: ${CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${IDLE_TIMEOUT:600000}
+      leak-detection-threshold: ${LEAK_DETECTION_THRESHOLD:0}
+      max-lifetime: ${MAX_LIFETIME:1800000}
+      minimum-idle: ${MINIMUM_IDLE:10}
+      keepalive-time: ${KEEPALIVE_TIME:0}
+
+logging:
+  level:
+    ROOT: ${LOGGING_LEVEL_ROOT:INFO}
+    ru.gpn.platform.silverplate.event_collector: ${LOGGING_LEVEL_PRJ:INFO}
+
+application:
+  syslog:
+    port: ${APPLICATION_SYSLOG_PORT:1514}
+    output-channel-name: ${APPLICATION_OUTPUT_CHANNEL_NAME:syslogChannel}
+  database:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+  rabbitmq:
+    host: ${APPLICATION_RABBITMQ_HOST}
+    port: ${APPLICATION_RABBITMQ_PORT:5672}
+    username: ${APPLICATION_RABBITMQ_USERNAME}
+    password: ${APPLICATION_RABBITMQ_PASSWORD}
+    virtual-host: ${APPLICATION_RABBITMQ_VIRTUALHOST:/}
+    queue: ${APPLICATION_RABBITMQ_QUEUE}
+    exchange: ${APPLICATION_RABBITMQ_EXCHANGE}
+    routing-key: ${APPLICATION_RABBITMQ_ROUTING_KEY}
+    client-id: ${APPLICATION_RABBITMQ_CLIENT_ID}
+    client-secret: ${APPLICATION_RABBITMQ_CLIENT_SECRET}
+    initial-interval: ${APPLICATION_RABBITMQ_INITIAL_INTERVAL:500}
+    multiplier: ${APPLICATION_RABBITMQ_MULTIPLIER:10.0}
+    max-interval: ${APPLICATION_RABBITMQ_MAX_INTERVAL:10000}
+    enable: ${APPLICATION_RABBITMQ_ENABLE:false}
+
+  integration:
+    events-queue: ${APPLICATION_INTEGRATION_EVENTS_QUEUE:events}
+    concurrent-consumers-number: ${APPLICATION_INTEGRATION_CONCURRENT_CONSUMERS_NUMBER:10}
+    event-schema: ${DB_EVENT_SCHEMA:events}
+    event-table-name: ${DB_EVENT_TABLE_NAME:main}
+    information-schema: ${INFORMATION_SCHEMA:information_schema}
+    columns-table-name: ${COLUMNS_TABLE_NAME:columns}

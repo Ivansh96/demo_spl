@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "generic.fullname" . }}
+  labels:
+    {{- include "generic.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.main.replicas }}
+  selector:
+    matchLabels:
+      {{- include "generic.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "generic.selectorLabels" . | nindent 8 }}
+      annotations:
+        version: {{ include "generic.fullversion" . }}
+      {{- with .Values.main.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.main.imagePullSecrets }}
+      imagePullSecrets:
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      serviceAccountName: {{ include "generic.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.main.podSecurityContext | nindent 8 }}
+      initContainers:
+      - name: init
+        image: "{{ .Values.main.image.registry }}/{{ .Values.main.image.path }}:{{ .Values.main.image.tag }}"
+        imagePullPolicy: "{{ .Values.main.image.pullPolicy }}"
+        command: ['/home/default/docker-entrypoint.sh', 'init']
+        envFrom:
+        - configMapRef:
+            name: {{ include "generic.fullname" . }}
+        - secretRef:
+            name: {{ include "generic.fullname" . }}
+        resources:
+        {{- toYaml .Values.initContainer.resources | nindent 10 }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+      containers:
+      - name: {{ include "generic.name" . }}
+        image: "{{ .Values.main.image.registry }}/{{ .Values.main.image.path }}:{{ .Values.main.image.tag }}"
+        imagePullPolicy: "{{ .Values.main.image.pullPolicy }}"
+        envFrom:
+        - configMapRef:
+            name: {{ include "generic.fullname" . }}
+        - secretRef:
+            name: {{ include "generic.fullname" . }}
+        resources:
+        {{- toYaml .Values.main.resources | nindent 10 }}
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+          name: http
+        - containerPort: 1514
+          protocol: UDP
+          name: syslog
+        livenessProbe:
+         httpGet:
+           scheme: HTTP
+           path: /actuator/health/liveness
+           port: 8090
+         initialDelaySeconds: 40
+         periodSeconds: 180
+         timeoutSeconds: 10
+        readinessProbe:
+         httpGet:
+           path: /actuator/health/readiness
+           port: 8090
+         periodSeconds: 30
+        securityContext:
+          {{- toYaml .Values.main.securityContext | nindent 10 }}
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      dnsPolicy: {{ .Values.main.dnsPolicy }}
+      {{- with .Values.main.hostAliases }}
+      hostAliases:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.main.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.main.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.main.tolerations }}
+      tolerations:
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
