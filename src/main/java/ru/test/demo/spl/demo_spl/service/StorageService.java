@@ -28,6 +28,7 @@ import static org.jooq.impl.DSL.*;
 @RequiredArgsConstructor
 @Slf4j
 public class StorageService {
+
     private final DSLContext dslContext;
     @Qualifier("eventTableName")
     private final Name eventTableName;

@@ -1,4 +1,4 @@
-package ru.test.demo.spl.demo_spl.service;
+package ru.test.demo.spl.demo_spl.unit;
 
 import org.junit.jupiter.api.Test;
 import ru.gpn.platform.silverplate.event_collector.cef.lib.model.Event;
@@ -112,10 +112,10 @@ public class EventParserTest {
                 .setEventClassId("100")
                 .setName("create")
                 .setSeverity((short) 3)
-                .setExtension("suser", "Shcherbak.SE@gazprom-neft.ru")
+                .setExtension("suser", "test.SE@testmail.ru")
                 .setExtension("src", "10.129.4.37")
-                .setExtension("dhost", "cradle-essentials-gateway-ms-main")
-                .setExtension("shost", "cradle-essentials-file-transfer-ms-main-7c865bd99-7d7ss");
+                .setExtension("dhost", "test-dhost-d88594")
+                .setExtension("shost", "test-shost-12932js");
 
         Event parsedFromStringEvent = eventFactory.fromString(SPL1, prefix);
 
@@ -141,9 +141,9 @@ public class EventParserTest {
                 .setName("event name")
                 .setSeverity((short) 11)
                 .setExtension("src", "10.129.4.37")
-                .setExtension("shost", "cradle-essentials-file-transfer-ms-main-7c865bd99-9d8ss")
-                .setExtension("dhost", "cradle-essentials-gateway-ms-main")
-                .setExtension("suser", "Shcherbak.SE@gazprom-neft.ru");
+                .setExtension("shost", "test-shost-12932js")
+                .setExtension("dhost", "test-dhost-d88594")
+                .setExtension("suser", "test.SE@testmail.ru");
 
         assert (Objects.equals(event.toString(), CEF1));
 
